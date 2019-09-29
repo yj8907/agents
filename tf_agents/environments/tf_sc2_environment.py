@@ -28,6 +28,8 @@ from absl import logging
 import gin
 import tensorflow as tf
 
+from pysc2.env.sc2_env import SC2Env
+
 from tf_agents.environments import batched_py_environment
 from tf_agents.environments import py_environment
 from tf_agents.environments import tf_environment
@@ -53,7 +55,7 @@ def _check_not_called_concurrently(lock):
 
 
 @gin.configurable
-class TFPyEnvironment(tf_environment.TFEnvironment):
+class TFSC2Environment(tf_environment.TFEnvironment):
     """Exposes a Python environment as an in-graph TF environment.
 
     This class supports Python environments that return nests of arrays as
@@ -73,14 +75,14 @@ class TFPyEnvironment(tf_environment.TFEnvironment):
 
         Args:
           environment: Environment to interact with, implementing
-            `py_environment.PyEnvironment`.  Or a `callable` that returns
+            `pysc2 environment`.  Or a `callable` that returns
             an environment of this form.  If a `callable` is provided and
             `thread_isolation` is provided, the callable is executed in the
             dedicated thread.
           check_dims: Whether should check batch dimensions of actions in `step`.
           isolation: If this value is `False` (default), interactions with
             the environment will occur within whatever thread the methods of the
-            `TFPyEnvironment` are run from.  For example, in TF graph mode, methods
+            `TFSC2Environment` are run from.  For example, in TF graph mode, methods
             like `step` are called from multiple threads created by the TensorFlow
             engine; calls to step the environment are guaranteed to be sequential,
             but not from the same thread.  This creates problems for environments
@@ -123,15 +125,9 @@ class TFPyEnvironment(tf_environment.TFEnvironment):
 
         if callable(environment):
             environment = self._execute(environment)
-        if not isinstance(environment, py_environment.PyEnvironment):
-            raise TypeError(
-                'Environment should implement py_environment.PyEnvironment')
+        if not isinstance(environment, SC2Env):
+            raise TypeError('Environment should implement SC2Env')
 
-        if not environment.batched:
-            # If executing in an isolated thread, do not enable multiprocessing for
-            # this environment.
-            environment = batched_py_environment.BatchedPyEnvironment(
-                [environment], multithreading=not self._pool)
         self._env = environment
         self._check_dims = check_dims
 
@@ -149,9 +145,9 @@ class TFPyEnvironment(tf_environment.TFEnvironment):
         time_step_spec = ts.time_step_spec(observation_spec)
         batch_size = self._env.batch_size if self._env.batch_size else 1
 
-        super(TFPyEnvironment, self).__init__(time_step_spec,
-                                              action_spec,
-                                              batch_size)
+        super(TFSC2Environment, self).__init__(time_step_spec,
+                                               action_spec,
+                                               batch_size)
 
         # Gather all the dtypes of the elements in time_step.
         self._time_step_dtypes = [

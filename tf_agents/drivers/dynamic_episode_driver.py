@@ -24,6 +24,10 @@ import tensorflow as tf
 
 from tf_agents.drivers import driver
 from tf_agents.trajectories import trajectory
+from tf_agents.policies import discrete_boltzmann_policy
+from tf_agents.policies import epsilon_discrete_boltzmann_policy
+from tf_agents.policies import epsilon_greedy_policy
+from tf_agents.policies import greedy_policy
 from tf_agents.utils import common
 from tf_agents.utils import nest_utils
 
@@ -110,8 +114,17 @@ class DynamicEpisodeDriver(driver.Driver):
       # parallel_iterations or doesn't properly propagate control dependencies
       # from one step to the next. Without this dep, self.env.step() is called
       # in parallel.
+      
       with tf.control_dependencies(tf.nest.flatten([time_step])):
-        next_time_step = self.env.step(action_step.action)
+          if isinstance(self.policy, (discrete_boltzmann_policy.DiscreteBoltzmannPolicy,
+                                      greedy_policy.GreedyPolicy,
+                                      epsilon_discrete_boltzmann_policy.EpsilonDiscreteBoltzmannPolicy)):
+              next_time_step = self.env.step(tf.cast(action_step.action[:, 0], tf.int64))
+          else:
+              next_time_step = self.env.step(action_step.action)
+              
+#      with tf.control_dependencies(tf.nest.flatten([time_step])):
+#        next_time_step = self.env.step(action_step.action)
 
       policy_state = action_step.state
 

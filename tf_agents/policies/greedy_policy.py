@@ -27,48 +27,76 @@ from tf_agents.trajectories import policy_step
 
 # TODO(b/131405384): Remove this once Deterministic does casting internally.
 class DeterministicWithLogProb(tfp.distributions.Deterministic):
-  """Thin wrapper around Deterministic that supports taking log_prob."""
+    """Thin wrapper around Deterministic that supports taking log_prob."""
 
-  def _log_prob(self, x):
-    """Takes log-probs by casting to tf.float32 instead of self.dtype."""
-    return tf.math.log(tf.cast(self.prob(x), dtype=tf.float32))
+    def _log_prob(self, x):
+        """Takes log-probs by casting to tf.float32 instead of self.dtype."""
+        return tf.math.log(tf.cast(self.prob(x), dtype=tf.float32))
 
 
 class GreedyPolicy(tf_policy.Base):
-  """Returns greedy samples of a given policy."""
+    """Returns greedy samples of a given policy."""
 
-  def __init__(self, policy, name=None):
-    """Builds a greedy TFPolicy wrapping the given policy.
+    def __init__(self, policy, name=None):
+        """Builds a greedy TFPolicy wrapping the given policy.
 
-    Args:
-      policy: A policy implementing the tf_policy.Base interface.
-      name: The name of this policy. All variables in this module will fall
-        under that name. Defaults to the class name.
-    """
-    super(GreedyPolicy, self).__init__(
-        policy.time_step_spec,
-        policy.action_spec,
-        policy.policy_state_spec,
-        policy.info_spec,
-        emit_log_probability=policy.emit_log_probability,
-        name=name)
-    self._wrapped_policy = policy
+        Args:
+          policy: A policy implementing the tf_policy.Base interface.
+          name: The name of this policy. All variables in this module will fall
+            under that name. Defaults to the class name.
+        """
+        super(GreedyPolicy, self).__init__(
+            policy.time_step_spec,
+            policy.action_spec,
+            policy.policy_state_spec,
+            policy.info_spec,
+            emit_log_probability=policy.emit_log_probability,
+            name=name)
+        self._wrapped_policy = policy
 
-  def _variables(self):
-    return self._wrapped_policy.variables()
+    @property
+    def wrapped_policy(self):
+        return self._wrapped_policy
 
-  def _distribution(self, time_step, policy_state):
-    def dist_fn(dist):
-      try:
-        greedy_action = dist.mode()
-      except NotImplementedError:
-        raise ValueError("Your network's distribution does not implement mode "
-                         "making it incompatible with a greedy policy.")
+    def _variables(self):
+        return self._wrapped_policy.variables()
 
-      return DeterministicWithLogProb(loc=greedy_action)
+    def _distribution(self, time_step, policy_state):
+        def dist_fn(dist):
+            try:
+                greedy_action = dist.mode()
+            except NotImplementedError:
+                raise ValueError("Your network's distribution does not implement mode "
+                                 "making it incompatible with a greedy policy.")
 
-    distribution_step = self._wrapped_policy.distribution(
-        time_step, policy_state)
-    return policy_step.PolicyStep(
-        tf.nest.map_structure(dist_fn, distribution_step.action),
-        distribution_step.state, distribution_step.info)
+            return DeterministicWithLogProb(loc=greedy_action)
+
+        distribution_step = self._wrapped_policy.distribution(
+            time_step, policy_state)
+        return policy_step.PolicyStep(
+            tf.nest.map_structure(dist_fn, distribution_step.action),
+            distribution_step.state, distribution_step.info)
+
+    def _action_distribution(self, time_step, policy_state=(), seed=None):
+
+        def dist_fn(dist):
+            try:
+                greedy_action = dist.mode()
+            except NotImplementedError:
+                raise ValueError("Your network's distribution does not implement mode "
+                                 "making it incompatible with a greedy policy.")
+
+            return DeterministicWithLogProb(loc=greedy_action)
+
+        wrapped_distribution_step = self._wrapped_policy.distribution(
+            time_step, policy_state)
+        distribution_step = policy_step.PolicyStep(
+            tf.nest.map_structure(dist_fn, wrapped_distribution_step.action),
+            wrapped_distribution_step.state, wrapped_distribution_step.info)
+
+        # action
+        seed_stream = tfp.distributions.SeedStream(seed=seed, salt='ppo_policy')
+        step = self._distribution2action(distribution_step, seed_stream)
+
+        return step, wrapped_distribution_step
+

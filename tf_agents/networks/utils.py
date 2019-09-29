@@ -154,8 +154,9 @@ def mlp_layers(conv_layer_params=None,
             kernel_initializer=kernel_initializer,
             name='/'.join([name, 'conv2d']) if name else None)
         for (filters, kernel_size, strides) in conv_layer_params
-    ])
-  layers.append(tf.keras.layers.Flatten())
+    ])       
+
+    layers.append(tf.keras.layers.Flatten())
 
   if fc_layer_params is not None:
     if dropout_layer_params is None:

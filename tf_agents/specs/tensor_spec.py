@@ -332,6 +332,8 @@ def sample_spec_nest(structure, seed=None, outer_dims=()):
       spec = BoundedTensorSpec.from_spec(spec)
       return sample_bounded_spec(
           spec, outer_dims=outer_dims, seed=seed_stream())
+    elif spec is None:
+      return None
     else:
       raise TypeError("Spec type not supported: '{}'".format(spec))
 

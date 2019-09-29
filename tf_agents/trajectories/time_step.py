@@ -299,8 +299,13 @@ def time_step_spec(observation_spec=None):
     return TimeStep(step_type=(), reward=(), discount=(), observation=())
 
   first_observation_spec = tf.nest.flatten(observation_spec)[0]
+  
+#  if isinstance(first_observation_spec,
+#                (tf.TypeSpec, tensor_spec.TensorSpec,
+#                 tensor_spec.BoundedTensorSpec)):
+        
   if isinstance(first_observation_spec,
-                (tf.TypeSpec, tensor_spec.TensorSpec,
+                (tensor_spec.TensorSpec,
                  tensor_spec.BoundedTensorSpec)):
     return TimeStep(
         step_type=tensor_spec.TensorSpec([], tf.int32, name='step_type'),
