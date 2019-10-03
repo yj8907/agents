@@ -160,7 +160,7 @@ class HeteroQPolicy(tf_policy.Base):
         self._total_num_actions = num_actions + 1
 
         return tensor_spec.BoundedTensorSpec(
-            shape=(1,), dtype=np.int32, name='combined_action_spec',
+            shape=(), dtype=np.int32, name='combined_action_spec',
             minimum=(0,),
             maximum=(num_actions - 1,))
 

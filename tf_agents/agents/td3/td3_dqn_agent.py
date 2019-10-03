@@ -16,7 +16,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tf_agents.policies import boltzmann_policy
-from tf_agents.policies import epsilon_greedy_policy
+from tf_agents.policies import epsilon_boltzmann_policy
 from tf_agents.policies import greedy_policy
 from tf_agents.policies import sequential_policy
 
@@ -56,7 +56,7 @@ class Td3DqnAgent(tf_agent.TFAgent):
                  q_networks,
                  critic_optimizer,
                  exploration_noise_std=0.1,
-                 boltzmann_temperature=None,
+                 boltzmann_temperature=10.0,
                  epsilon_greedy=0.1,
                  q_networks_2=None,
                  target_q_networks=None,
@@ -196,16 +196,12 @@ class Td3DqnAgent(tf_agent.TFAgent):
                               use_previous_action=use_previous_action, name="HeteroQPolicy_2_"+str(i)))
         self._q_value_policies_1 = policies
 
-        if boltzmann_temperature is not None:
-            collect_policies = [boltzmann_policy.BoltzmannPolicy(
-                p, temperature=self._boltzmann_temperature) for p in policies]
-        else:
-            raise ValueError("boltzmann_temperature should not be None")
-            # collect_policies = [epsilon_greedy_policy.EpsilonGreedyPolicy(
-            #     p, epsilon=self._epsilon_greedy) for p in policies]
+        collect_policies = [epsilon_boltzmann_policy.EpsilonBoltzmannPolicy(
+            p, temperature=boltzmann_temperature, epsilon=self._epsilon_greedy, remove_neg_inf=True) for p in policies]
+
         collect_policy = sequential_policy.SequentialPolicy(collect_policies)
 
-        policies = [greedy_policy.GreedyPolicy(p) for p in policies]
+        policies = [greedy_policy.GreedyPolicy(p, remove_neg_inf=True) for p in policies]
         policy = sequential_policy.SequentialPolicy(policies)
 
         # Create self._target_greedy_policy in order to compute target Q-values in _compute_next_q_values.
@@ -223,8 +219,8 @@ class Td3DqnAgent(tf_agent.TFAgent):
                               use_previous_action=use_previous_action, name="TargetHeteroQPolicy_2"+str(i)))
         self._target_q_value_policies_1 = target_policies
 
-        self._target_q_value_policies_1 = [greedy_policy.GreedyPolicy(p) for p in self._target_q_value_policies_1]
-        self._target_q_value_policies_2 = [greedy_policy.GreedyPolicy(p) for p in self._target_q_value_policies_2]
+        self._target_q_value_policies_1 = [greedy_policy.GreedyPolicy(p, remove_neg_inf=True) for p in self._target_q_value_policies_1]
+        self._target_q_value_policies_2 = [greedy_policy.GreedyPolicy(p, remove_neg_inf=True) for p in self._target_q_value_policies_2]
 
         target_policies = self._target_q_value_policies_1
         target_policy = sequential_policy.SequentialPolicy(target_policies)
@@ -565,16 +561,19 @@ class Td3DqnAgent(tf_agent.TFAgent):
                 time_step.observation.pop(available_actions_key)
 
             # print((i, policy))
-            action_step, distribution_step = policy.action_distribution(time_step)
+            try:
+                action_step, distribution_step = policy.action_distribution(time_step)
+            except:
+                raise ValueError("policy should implement action_distribution")
 
             if action_transform_key in type(policy).__dict__.keys():
                 action = policy.inverse_transform_action(action_step.action)
             else:
-                assert 'wrapped_policy' in type(policy).__dict__.keys()
+                assert 'wrapped_policy' in dir(policy)
                 assert action_transform_key in type(policy.wrapped_policy).__dict__.keys()
                 action = policy.wrapped_policy.inverse_transform_action(action_step.action)
 
-            raw_action.append(action_step.action)
+            raw_action.append(tf.expand_dims(action_step.action, axis=-1))
             transformed_actions.append(tf.expand_dims(action, axis=1))
 
             current_actions = dict()
@@ -634,7 +633,7 @@ class Td3DqnAgent(tf_agent.TFAgent):
         # param. Note: assumes len(tf.nest.flatten(action_spec)) == 1.
         multi_dim_actions = False
         value = [common.index_with_actions(
-            self._append2logits(tf.squeeze(q_values, axis=1)),
+            self._append2logits(q_values),
             tf.cast(act, dtype=tf.int32),
             multi_dim_actions=multi_dim_actions) for q_values, act in zip(q_values_seq, raw_actions)]
         # due to dist.mode() in GreedyPolicy, 0 is selected for masked action. So we need to remove -inf
@@ -659,7 +658,7 @@ class Td3DqnAgent(tf_agent.TFAgent):
         raw_actions = tf.unstack(actions[action_key], axis=1)
         multi_dim_actions = False
         value = [common.index_with_actions(
-            self._append2logits(tf.squeeze(q_values, axis=1)),
+            self._append2logits(q_values),
             tf.cast(act, dtype=tf.int32),
             multi_dim_actions=multi_dim_actions) for q_values, act in zip(q_values_seq, raw_actions)]
         # due to dist.mode() in GreedyPolicy, 0 is selected for masked action. So we need to remove -inf

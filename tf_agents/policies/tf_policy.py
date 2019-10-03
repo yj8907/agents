@@ -314,16 +314,6 @@ class Base(tf.Module):
 
         step, distribution_step = self._action_distribution(time_step, policy_state, seed)
 
-        # def extract_logits(distribution_step):
-        #   if isinstance(distribution_step, policy_step.PolicyStep)\
-        #           and isinstance(distribution_step.action, shifted_categorical.ShiftedCategorical):
-        #     return distribution_step._replace(action=distribution_step.action.logits)
-        #   else:
-        #     raise ValueError("distribution_step should be PolicyStep and action should be ShiftedCategorical"
-        #                      "and distribution_step is {}".format(type(distribution_step)))
-        #
-        # distribution_step = tf.nest.map_structure(extract_logits, distribution_step)
-
         return step, distribution_step
 
     def _action_distribution(self, time_step, policy_state, seed):
@@ -350,10 +340,13 @@ class Base(tf.Module):
 
         # distribution
         seed_stream = tfd.SeedStream(seed=seed, salt='ppo_policy')
-        distribution_step = self._distribution(time_step, policy_state)
-
-        # action
-        step = self._distribution2action(distribution_step, seed_stream)
+        try:
+            distribution_step = self._distribution(time_step, policy_state)
+            # action
+            step = self._distribution2action(distribution_step, seed_stream)
+        except:
+            step = self._action(time_step, policy_state, seed)
+            distribution_step = None
 
         return step, distribution_step
 

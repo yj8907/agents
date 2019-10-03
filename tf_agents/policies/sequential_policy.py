@@ -151,14 +151,17 @@ class SequentialPolicy(tf_policy.Base):
 
             action_step, distribution_step = policy.action_distribution(time_step, policy_state, seed)
 
-            raw_action.append(action_step.action)
+            raw_action.append(tf.expand_dims(action_step.action, axis=-1))
             # each action has different action logit size so we can't concat logits
-            action_logits.append(distribution_step.action.logits)
+            if distribution_step is not None:
+                action_logits.append(distribution_step.action.logits)
+            else:
+                action_logits.append(distribution_step)
 
             if action_transform_key in type(policy).__dict__.keys():
                 action = policy.inverse_transform_action(action_step.action)
             else:
-                assert 'wrapped_policy' in type(policy).__dict__.keys()
+                assert 'wrapped_policy' in dir(policy)
                 assert action_transform_key in type(policy.wrapped_policy).__dict__.keys()
                 action = policy.wrapped_policy.inverse_transform_action(action_step.action)
 

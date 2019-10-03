@@ -146,7 +146,6 @@ class SC2Env(env_abc.Env):
 
         return time_step
 
-
     def stop(self):
         self._env.close()
 
@@ -251,7 +250,7 @@ class SC2Env(env_abc.Env):
                         action_spec[k] = v[step]
         else:
             action_spec['structured'] = tensor_spec.BoundedTensorSpec(
-                shape=(1,), dtype=np.int32, name="sc2_func_action_spec",
+                shape=(), dtype=np.int32, name="sc2_func_action_spec",
                 minimum=(0,),
                 maximum=(len(self.act_wrapper.func_ids) - 1,))
 
@@ -265,7 +264,7 @@ class SC2Env(env_abc.Env):
         elif current_action_step == 0:
             previous_action_spec = dict()
             previous_action_spec['discrete'] = tensor_spec.BoundedTensorSpec(
-                shape=(1,), dtype=np.int32,
+                shape=(), dtype=np.int32,
                 name='functions',
                 minimum=(0,), maximum=(len(self.act_wrapper.func_ids) - 1,))
         elif current_action_step == 1:
@@ -275,7 +274,7 @@ class SC2Env(env_abc.Env):
 
             previous_action_spec = dict()
             previous_action_spec['discrete'] = tensor_spec.BoundedTensorSpec(
-                shape=(1,), dtype=np.int32,
+                shape=(), dtype=np.int32,
                 name='discrete_func',
                 minimum=(0,), maximum=(num_discrete_actions - 1,))
             previous_action_spec['continuous'] = tensor_spec.BoundedTensorSpec(
@@ -292,7 +291,7 @@ class SC2Env(env_abc.Env):
         else:
             func_action_spec = dict()
             func_action_spec['discrete'] = tensor_spec.BoundedTensorSpec(
-                shape=(1,), dtype=np.int32,
+                shape=(), dtype=np.int32,
                 name='functions',
                 minimum=(0,), maximum=(len(self.act_wrapper.func_ids) - 1,))
 
@@ -851,7 +850,11 @@ def get_spatial_type(feat_names, feats):
 
 
 def list2tuple(spec):
-
+    """
+    tf_agents assert spec should be tuple instead of list
+    :param spec: TensorSpec object
+    :return:
+    """
     ##TODO: should implement nested list2tuple
     if isinstance(spec, dict):
         for k, v in spec.items():
