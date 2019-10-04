@@ -72,7 +72,7 @@ def tf_nest_concatenate(nested_tensors, axis=0):
     """
     Implement concatenation of nested tensor objects
 
-    :param nested_tensors: A list of nested tensors.
+    :param nested_tensors: A list of nested tensors with the same nest pattern
     :return: concatenated tensors packed as nested_tensors
     """
 

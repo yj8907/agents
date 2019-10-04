@@ -8,8 +8,6 @@ from pysc2.lib import protocol
 from pysc2.env.environment import StepType
 
 from tf_agents.environments import env_abc
-from tf_agents.environments import msg_multiproc
-from tf_agents.environments import utils
 from tf_agents.networks import mixed_q_network
 from tf_agents.trajectories import time_step as ts
 
@@ -23,7 +21,7 @@ ACTIONS_MINIGAMES, ACTIONS_MINIGAMES_ALL, ACTIONS_ALL = ['minigames', 'minigames
 
 
 @gin.configurable
-class SC2EnvWrapper(env_abc.Env):
+class SC2Env(env_abc.Env):
     """
     'minigames' action set is enough to solve all minigames listed in SC2LE
     'minigames_all' expands that set with actions that may improve end results, but will drop performance
@@ -46,7 +44,7 @@ class SC2EnvWrapper(env_abc.Env):
             obs_features=None,
             action_ids=ACTIONS_MINIGAMES
     ):
-        super(SC2EnvWrapper, self).__init__(map_name, render, reset_done, max_ep_len)
+        super(SC2Env, self).__init__(map_name, render, reset_done, max_ep_len)
 
         self.step_mul = step_mul
         self._screen_dim = screen_dim
@@ -93,52 +91,63 @@ class SC2EnvWrapper(env_abc.Env):
             flags.FLAGS([""])
 #            flags.FLAGS(sys.argv)
 
-        sc2_envs = []
-        for i in range(self.batch_size):
-            env = msg_multiproc.BaesSC2Env(map_name=self.id,
-                render=self.render,
-                reset_done=self.reset_done,
-                max_ep_len=self.max_ep_len,
-                screen_dim=self._screen_dim,
-                minimap_dim=self._minimap_dim,
-                step_mul=self.step_mul,)
-            sc2_envs.append(env)
-        sc2_multiproc_env = msg_multiproc.MsgMultiProcEnv(sc2_envs)
+        self._env = sc2_env.SC2Env(
+            map_name=self.id,
+            visualize=self.render,
+            agent_interface_format=[features.parse_agent_interface_format(
+                feature_screen=self._screen_dim,
+                feature_minimap=self._minimap_dim,
+                rgb_screen=None,
+                rgb_minimap=None
+            )],
+            step_mul=self.step_mul, )
 
-        self._env = sc2_multiproc_env
-        self._env.start()
+    def step(self, action):
+        try:
+            step_type, reward, discount, obs_wrapped = self.obs_wrapper(self._env.step(self.act_wrapper(action)))
+        except protocol.ConnectionError:
+            # hacky fix from websocket timeout issue...
+            # this results in faulty reward signals, but I guess it beats completely crashing...
+            self.restart()
+            return self.reset(), 0, 1
 
-    def _wrap_time_step(self, time_steps):
-
-        assert isinstance(time_steps, (list, tuple))
-        time_steps = list(zip(*[self.obs_wrapper(ts) for ts in time_steps]))
-        step_type, reward, discount, obs_wrapped = [utils.tf_nest_concatenate(self._batch_tensors(ts))
-                                                    for ts in time_steps]
+        if step_type == StepType.LAST and self.reset_done:
+            reset_timestep = self._reset()
+            obs_wrapped = reset_timestep.observation
 
         flat_observations = tf.nest.flatten(obs_wrapped)
-        time_step = self._set_names_and_shapes(step_type, reward, discount, *flat_observations)
+
+        time_step = self._set_names_and_shapes(step_type, reward, discount,
+                                   *flat_observations)
+        if self.batch_size == 1:
+            time_step = self._batch_tensors(time_step)
 
         return time_step
 
-    def step(self, action):
-
-        split_actions = utils.tf_nest_split(action, axis=0)
-        split_actions = [self.act_wrapper(act) for act in split_actions]
-
-        time_steps = self._env.step(split_actions)
-        return self._wrap_time_step(time_steps)
-
     def _reset(self):
-        time_steps = self._env.reset()
-        return self._wrap_time_step(time_steps)
+        try:
+            step_type, reward, discount, obs_wrapped = self.obs_wrapper(self._env.reset())
+        except protocol.ConnectionError:
+            # hacky fix from websocket timeout issue...
+            # this results in faulty reward signals, but I guess it beats completely crashing...
+            self.restart()
+            return self._reset()
+
+        flat_observations = tf.nest.flatten(obs_wrapped)
+        time_step = self._set_names_and_shapes(step_type, reward, discount,
+                                   *flat_observations)
+        return time_step
 
     def reset(self):
 
         time_step = self._reset()
+        if self.batch_size == 1:
+            time_step = self._batch_tensors(time_step)
+
         return time_step
 
     def stop(self):
-        self._env.stop()
+        self._env.close()
 
     def restart(self):
         self.stop()
@@ -175,7 +184,14 @@ class SC2EnvWrapper(env_abc.Env):
         """
 
         with tf.name_scope('current_time_step'):
-            return self.reset()
+            step_type, reward, discount, obs_wrapped = self.obs_wrapper(self._env.reset())
+            flat_observations = tf.nest.flatten(obs_wrapped)
+            time_step = self._set_names_and_shapes(step_type, reward, discount,
+                                              *flat_observations)
+            if self.batch_size == 1:
+                time_step = self._batch_tensors(time_step)
+
+            return time_step
 
     def _batch_tensors(self, time_step):
         ##TODO: implement multiprocessing

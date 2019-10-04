@@ -43,11 +43,4 @@ class Env(object):
     def act_spec(self):
         pass
 
-    @abstractmethod
-    def time_step_spec(self):
-        pass
-
-    @abstractmethod
-    def current_time_step(self):
-        pass
 
