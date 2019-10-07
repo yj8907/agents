@@ -48,7 +48,8 @@ class BaesSC2Env(env_abc.Env):
                     rgb_screen=None,
                     rgb_minimap=None
                 )],
-                step_mul=self.step_mul, )
+                step_mul=self.step_mul,)
+                # game_steps_per_episode=10
         except protocol.ConnectionError:
             self.start()
 
@@ -61,7 +62,9 @@ class BaesSC2Env(env_abc.Env):
 
         if time_step[0].step_type == StepType.LAST and self.reset_done:
             reset_timestep = self.reset()[0]
-            time_step[0]._replace(observation=reset_timestep.observation)
+            time_step = list(time_step)
+            time_step[0] = time_step[0]._replace(observation=reset_timestep.observation)
+            time_step = tuple(time_step)
 
         return time_step
 
