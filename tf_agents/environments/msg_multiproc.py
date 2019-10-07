@@ -60,7 +60,7 @@ class BaesSC2Env(env_abc.Env):
             return self.reset(), 0, 1
 
         if time_step[0].step_type == StepType.LAST and self.reset_done:
-            reset_timestep = self.reset()
+            reset_timestep = self.reset()[0]
             time_step[0]._replace(observation=reset_timestep.observation)
 
         return time_step
