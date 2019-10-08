@@ -268,7 +268,7 @@ class MixedQNetwork(network.Network):
                         obs_embedding_size = 4
                         state_num_classes = spec.maximum[0] - spec.minimum[0] + 1
                         obs_embeddings = tf.Variable(
-                            tf.random.normal([state_num_classes, obs_embedding_size]), "obs_embeddings_" + spec.name)
+                            tf.random.normal([state_num_classes, obs_embedding_size]), name="obs_embeddings_" + spec.name)
                         embeddings[type_name][spec.name] = obs_embeddings
 
         if self._previous_action_spec is not None:
@@ -283,7 +283,7 @@ class MixedQNetwork(network.Network):
                 # to allow for masked actions
                 action_num_classes += 1
                 self._previous_action_embeddings = tf.Variable(
-                    tf.random.normal([action_num_classes, action_embedding_size]), "action_embeddings")
+                    tf.random.normal([action_num_classes, action_embedding_size]), name="action_embeddings")
 
         self._embeddings = embeddings
 
