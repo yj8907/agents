@@ -358,7 +358,7 @@ class Td3DqnAgent(tf_agent.TFAgent):
             assert trainable_critic_variables, ('No trainable critic variables to '
                                                 'optimize.')
             tape.watch(trainable_critic_variables)
-            critic_loss = self.critic_loss(experience, weights=weights)
+            critic_loss = self.critic_loss(experience, gamma=self._gamma, weights=weights)
 
         tf.debugging.check_numerics(critic_loss, 'Critic loss is inf or nan.')
         critic_grads = tape.gradient(critic_loss, trainable_critic_variables)
