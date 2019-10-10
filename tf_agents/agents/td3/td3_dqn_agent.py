@@ -23,7 +23,7 @@ from tf_agents.policies import sequential_policy
 from tf_agents.networks.q_network import QNetwork
 
 from tf_agents.agents import tf_agent
-
+from tf_agents.trajectories.time_step import StepType
 from tf_agents.policies import hetero_q_policy
 from tf_agents.policies import gaussian_policy
 from tf_agents.trajectories import trajectory
@@ -636,15 +636,15 @@ class Td3DqnAgent(tf_agent.TFAgent):
         # Handle action_spec.shape=(), and shape=(1,) by using the multi_dim_actions
         # param. Note: assumes len(tf.nest.flatten(action_spec)) == 1.
         multi_dim_actions = False
-        value = [common.index_with_actions(
+        values = [common.index_with_actions(
             self._append2logits(q_values),
             tf.cast(act, dtype=tf.int32),
             multi_dim_actions=multi_dim_actions) for q_values, act in zip(q_values_seq, raw_actions)]
         # due to dist.mode() in GreedyPolicy, 0 is selected for masked action. So we need to remove -inf
-        value = [tf.where(tf.equal(v, NEG_INF), 0.0, v) for v in value]
-        value = tf.add_n(value)
+        values = [tf.where(tf.equal(v, NEG_INF), 0.0, v) for v in values]
+        values = tf.add_n(values)
 
-        return value
+        return values
 
     def _compute_next_q_values(self, target_policies, time_steps):
         """Compute the q value of the next state for TD error computation.
@@ -661,15 +661,19 @@ class Td3DqnAgent(tf_agent.TFAgent):
         action_key = 'raw'
         raw_actions = tf.unstack(actions[action_key], axis=1)
         multi_dim_actions = False
-        value = [common.index_with_actions(
+        values = [common.index_with_actions(
             self._append2logits(q_values),
             tf.cast(act, dtype=tf.int32),
             multi_dim_actions=multi_dim_actions) for q_values, act in zip(q_values_seq, raw_actions)]
         # due to dist.mode() in GreedyPolicy, 0 is selected for masked action. So we need to remove -inf
-        value = [tf.where(tf.equal(v, NEG_INF), 0.0, v) for v in value]
-        value = tf.add_n(value)
+        values = [tf.where(tf.equal(v, NEG_INF), 0.0, v) for v in values]
 
-        return value
+        # specifically set for sc2 minimaps
+        values = [tf.where(tf.equal(time_steps.step_type, StepType.FIRST), 0.0, v) for v in values]
+        values = [tf.where(tf.equal(time_steps.reward, 1.0), 0.0, v) for v in values]
+
+        values = tf.add_n(values)
+        return values
 
     def _append2logits(self, logits):
         """

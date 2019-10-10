@@ -22,7 +22,7 @@ class BaesSC2Env(env_abc.Env):
             max_ep_len=None,
             screen_dim=24,
             minimap_dim=16,
-            step_mul=8,
+            step_mul=24,
     ):
         super(BaesSC2Env, self).__init__(map_name, render, reset_done, max_ep_len)
 
@@ -63,7 +63,8 @@ class BaesSC2Env(env_abc.Env):
         if time_step[0].step_type == StepType.LAST and self.reset_done:
             reset_timestep = self.reset()[0]
             time_step = list(time_step)
-            time_step[0] = time_step[0]._replace(observation=reset_timestep.observation)
+            time_step[0] = time_step[0]._replace(step_type=reset_timestep.step_type,
+                                                 observation=reset_timestep.observation)
             time_step = tuple(time_step)
 
         return time_step

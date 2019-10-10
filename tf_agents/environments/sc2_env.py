@@ -41,7 +41,7 @@ class SC2EnvWrapper(env_abc.Env):
             max_ep_len=None,
             screen_dim=24,
             minimap_dim=16,
-            step_mul=8,
+            step_mul=16,
             batch_size=1,
             obs_features=None,
             action_ids=ACTIONS_MINIGAMES
@@ -373,8 +373,6 @@ class SC2EnvWrapper(env_abc.Env):
             observation['available_actions'] = np.random.randint(0, 2, (batch_size, action_dim))
 
         return observation, previous_action
-
-
 
 
 class ObservationWrapper:
