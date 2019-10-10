@@ -515,6 +515,7 @@ class Td3DqnAgent(tf_agent.TFAgent):
 
             critic_loss = (self._td_errors_loss_fn(td_targets, pred_td_targets_1)
                            + self._td_errors_loss_fn(td_targets, pred_td_targets_2))
+
             if nest_utils.is_batched_nested_tensors(
                     time_steps, self.time_step_spec, num_outer_dims=2):
                 # Sum over the time dimension.
@@ -523,7 +524,10 @@ class Td3DqnAgent(tf_agent.TFAgent):
             if weights is not None:
                 critic_loss *= weights
             # print("forth pass")
-            return tf.reduce_mean(input_tensor=critic_loss)
+
+            regularization_loss = self._embedding_loss(self._q_network_1) + self._embedding_loss(self._q_network_2)
+
+            return tf.reduce_mean(input_tensor=critic_loss) + regularization_loss
 
     def _sequential_network_activation(self, policies, time_step_input, actions=None):
 
@@ -687,5 +691,19 @@ class Td3DqnAgent(tf_agent.TFAgent):
         noise = tf.clip_by_value(noise, -self._target_policy_noise_clip,
                                  self._target_policy_noise_clip)
         return action + noise
+
+    def _embedding_loss(self, q_networks, weight=5e-4):
+        """
+
+        :param q_networks: list/tuple of networks
+        :param weight: l2 loss weight
+        :return:
+        """
+        losses = []
+        for net in q_networks:
+            for var in net.variables:
+                if 'embedding' in var.name:
+                    losses.append(tf.nn.l2_loss(var))
+        return tf.add_n(losses)*weight
 
 
