@@ -669,7 +669,7 @@ class Td3DqnAgent(tf_agent.TFAgent):
         values = [tf.where(tf.equal(v, NEG_INF), 0.0, v) for v in values]
 
         # specifically set for sc2 minimaps
-        values = [tf.where(tf.equal(time_steps.step_type, StepType.FIRST), 0.0, v) for v in values]
+        values = [tf.where(tf.equal(time_steps.step_type, StepType.LAST), 0.0, v) for v in values]
         values = [tf.where(tf.equal(time_steps.reward, 1.0), 0.0, v) for v in values]
 
         values = tf.add_n(values)

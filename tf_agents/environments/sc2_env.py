@@ -53,6 +53,7 @@ class SC2EnvWrapper(env_abc.Env):
         self._minimap_dim = minimap_dim
         self._env = None
         self.batch_size = batch_size
+        self._state = None
 
         # sensible action set for all minigames
         if not action_ids or action_ids in [ACTIONS_MINIGAMES, ACTIONS_MINIGAMES_ALL]:
@@ -126,7 +127,16 @@ class SC2EnvWrapper(env_abc.Env):
         split_actions = [self.act_wrapper(act) for act in split_actions]
 
         time_steps = self._env.step(split_actions)
-        return self._wrap_time_step(time_steps)
+        wrapped_time_step = self._wrap_time_step(time_steps)
+
+        # handle sc2 step_type.LAST
+        if self._state is not None:
+            reset_step_type = tf.where(self._state, StepType.FIRST.value, wrapped_time_step.step_type)
+            wrapped_time_step = wrapped_time_step._replace(step_type=reset_step_type)
+
+        self._state = wrapped_time_step.step_type == StepType.LAST
+
+        return wrapped_time_step
 
     def _reset(self):
         time_steps = self._env.reset()

@@ -30,6 +30,7 @@ class BaesSC2Env(env_abc.Env):
         self._screen_dim = screen_dim
         self._minimap_dim = minimap_dim
         self._env = None
+        self._state = None
 
     def start(self):
         # importing here to lazy-load
@@ -54,24 +55,31 @@ class BaesSC2Env(env_abc.Env):
             self.start()
 
     def step(self, action):
+
         try:
             time_step = self._env.step(action)
         except protocol.ConnectionError:
             self.restart()
             return self.reset(), 0, 1
 
-        if time_step[0].step_type == StepType.LAST and self.reset_done:
-            reset_timestep = self.reset()[0]
+        if self._state == StepType.LAST:
+            # print('last is final')
+            self._state = None
+            reset_timestep = self._env.reset()[0]
+            # print(reset_timestep.step_type)
             time_step = list(time_step)
             time_step[0] = time_step[0]._replace(step_type=reset_timestep.step_type,
                                                  observation=reset_timestep.observation)
             time_step = tuple(time_step)
+            # print(time_step[0].step_type)
+
+        if time_step[0].step_type == StepType.LAST and self.reset_done:
+            self._state = StepType.LAST
 
         return time_step
 
     def reset(self):
         try:
-            time_step = self._env.reset()
             time_step = self._env.reset()
         except protocol.ConnectionError:
             self.restart()

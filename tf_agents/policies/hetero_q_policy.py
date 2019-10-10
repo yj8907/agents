@@ -181,9 +181,10 @@ class HeteroQPolicy(tf_policy.Base):
                     for j in range(width):
                         for k in range(num_types):
                             # normalize coordinates
-                            # self._action_lookup[num_actions] = (float(num_action_types),
-                            #                                     (i/float(height), j/float(width)))
-                            self._action_lookup.append([float(num_action_types+k), i/float(height), j/float(width)])
+                            # self._action_lookup.append([float(num_action_types+k), i/float(height), j/float(width)])
+                            # change y coordinate to x coordinate
+                            self._action_lookup.append(
+                                [float(num_action_types + k), j / float(width), i / float(height)])
                             num_actions += 1
                 num_action_types += num_types
 
