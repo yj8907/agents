@@ -525,9 +525,8 @@ class Td3DqnAgent(tf_agent.TFAgent):
                 critic_loss *= weights
             # print("forth pass")
 
-            regularization_loss = self._embedding_loss(self._q_network_1) + self._embedding_loss(self._q_network_2)
-
-            return tf.reduce_mean(input_tensor=critic_loss) + regularization_loss
+            # regularization_loss = self._embedding_loss(self._q_network_1) + self._embedding_loss(self._q_network_2)
+            return tf.reduce_mean(input_tensor=critic_loss)
 
     def _sequential_network_activation(self, policies, time_step_input, actions=None):
 
